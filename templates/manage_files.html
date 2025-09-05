@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Files - Audio Processor v3.0{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h1>Manage Files</h1>
+            <p>Session: <code>{{ session_id }}</code></p>
+        </div>
+        
+        <div class="card-body">
+            <div class="files-section">
+                <h3>Uploaded Files ({{ files|length }})</h3>
+                <div class="files-list" id="filesList">
+                    {% for file in files %}
+                    <div class="file-item" data-filename="{{ file.saved_name }}">
+                        <div class="file-info">
+                            <span class="filename">{{ file.original_name }}</span>
+                            {% if file.duration_seconds %}
+                            <span class="duration">{{ "%.1f"|format(file.duration_seconds) }}s</span>
+                            {% endif %}
+                        </div>
+                        <button class="btn btn-danger btn-sm remove-file" data-filename="{{ file.saved_name }}">Remove</button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="spectrograms-section">
+                <h3>Select Spectrograms to Generate</h3>
+                <div class="selection-controls">
+                    <button id="selectAll" class="btn btn-secondary btn-sm">Select All</button>
+                    <button id="selectNone" class="btn btn-secondary btn-sm">Select None</button>
+                    <button id="selectRecommended" class="btn btn-secondary btn-sm">Recommended for Bearing Faults</button>
+                    <span class="selection-count" id="selectionCount">0 of 6 selected</span>
+                </div>
+                
+                <div class="spectrogram-grid">
+                    {% for spec_type in config.AVAILABLE_SPECTROGRAMS %}
+                    <div class="spec-option">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="spectrograms" value="{{ spec_type }}" 
+                                   {% if spec_type in config.DEFAULT_SPECTROGRAMS %}checked{% endif %}>
+                            <span class="checkmark"></span>
+                            <div class="spec-info">
+                                <span class="spec-name">{{ spec_type|title }}</span>
+                                <span class="spec-desc">{{ config.SPECTROGRAM_DESCRIPTIONS[spec_type] }}</span>
+                            </div>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="processBtn" class="btn btn-primary btn-large" disabled>Process Files</button>
+                <button id="deleteBatchBtn" class="btn btn-danger">Delete Batch</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="sessionId" value="{{ session_id }}">
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/manage.js') }}"></script>
+{% endblock %}
