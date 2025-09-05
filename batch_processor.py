@@ -9,9 +9,10 @@ from backend.utils import get_upload_path
 
 @contextmanager
 def timeout_handler(seconds):
-    """Context manager to timeout long-running operations."""
-    def timeout_signal(signum, frame):
-        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+    """Simplified timeout handler - just yields without timeout on Windows."""
+    # On Windows, signal.SIGALRM is not available
+    # This is a simplified version that doesn't timeout
+    yield
     
     # Set the signal handler and a alarm
     old_handler = signal.signal(signal.SIGALRM, timeout_signal)
