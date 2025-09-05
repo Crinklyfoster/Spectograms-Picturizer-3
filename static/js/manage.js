@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.started) {
                 // Redirect to progress page
-                window.location.href = `/batch_progress.html?session_id=${sessionId}`;
+                window.location.href = `/batch_progress?session_id=${sessionId}`;
             } else {
                 alert('Error starting processing: ' + (data.error || 'Unknown error'));
                 processBtn.disabled = false;
