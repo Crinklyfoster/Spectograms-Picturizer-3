@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Audio Processor v3.0{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h1>Processing Results</h1>
+            <p>Session: <code>{{ session_id }}</code></p>
+        </div>
+        
+        <div class="card-body">
+            <div class="results-summary">
+                <div class="summary-item">
+                    <h3>{{ session_data.total_files }}</h3>
+                    <span>Files Processed</span>
+                </div>
+                <div class="summary-item">
+                    <h3>{{ spectrograms|length }}</h3>
+                    <span>Spectrograms Generated</span>
+                </div>
+                <div class="summary-item">
+                    <h3>{% if features_csv_exists %}✅{% else %}❌{% endif %}</h3>
+                    <span>Features {% if features_csv_exists %}Extracted{% else %}Missing{% endif %}</span>
+                </div>
+            </div>
+            
+            {% if session_data.errors %}
+            <div class="errors-section">
+                <h3>Processing Errors ({{ session_data.errors|length }})</h3>
+                <div class="error-list">
+                    {% for error in session_data.errors %}
+                    <div class="error-item">
+                        <strong>{{ error.file }}:</strong> {{ error.message }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="downloads-section">
+                <h3>Downloads</h3>
+                <div class="download-buttons">
+                    {% if features_csv_exists %}
+                    <a href="{{ url_for('download_features', session_id=session_id, format='csv') }}" 
+                       class="btn btn-primary">Download Features (CSV)</a>
+                    {% endif %}
+                    
+                    {% if features_json_exists %}
+                    <a href="{{ url_for('download_features', session_id=session_id, format='json') }}" 
+                       class="btn btn-secondary">Download Features (JSON)</a>
+                    {% endif %}
+                    
+                    {% if spectrograms %}
+                    <a href="{{ url_for('download_spectrograms', session_id=session_id) }}" 
+                       class="btn btn-success">Download Spectrograms (ZIP)</a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if spectrograms %}
+            <div class="spectrograms-section">
+                <h3>Generated Spectrograms</h3>
+                <div class="spectrograms-grid">
+                    {% for spec_file in spectrograms %}
+                    <div class="spectrogram-item">
+                        <div class="spec-thumbnail">
+                            <img src="{{ url_for('static', filename='../results/' + session_id + '/' + spec_file) }}" 
+                                 alt="{{ spec_file }}" loading="lazy">
+                        </div>
+                        <div class="spec-name">{{ spec_file }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="action-buttons">
+                <a href="{{ url_for('index') }}" class="btn btn-primary">Process New Files</a>
+                <button id="deleteBatchBtn" class="btn btn-danger" data-session="{{ session_id }}">Delete This Batch</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('deleteBatchBtn').addEventListener('click', function() {
+    const sessionId = this.getAttribute('data-session');
+    if (confirm('Are you sure you want to delete this batch? This cannot be undone.')) {
+        fetch(`/delete_session/${sessionId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.deleted) {
+                alert('Batch deleted successfully');
+                window.location.href = '/';
+            } else {
+                alert('Error deleting batch');
+            }
+        })
+        .catch(error => {
+            alert('Error deleting batch: ' + error);
+        });
+    }
+});
+</script>
+{% endblock %}
