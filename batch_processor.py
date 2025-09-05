@@ -1,9 +1,28 @@
 import os
 import time
 import logging
+import signal
+from contextlib import contextmanager
 from backend.spectrograms import generate_spectrograms
 from backend.features import extract_all_features
 from backend.utils import get_upload_path
+
+@contextmanager
+def timeout_handler(seconds):
+    """Context manager to timeout long-running operations."""
+    def timeout_signal(signum, frame):
+        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+    
+    # Set the signal handler and a alarm
+    old_handler = signal.signal(signal.SIGALRM, timeout_signal)
+    signal.alarm(seconds)
+    
+    try:
+        yield
+    finally:
+        # Restore the old signal handler
+        signal.signal(signal.SIGALRM, old_handler)
+        signal.alarm(0)
 
 class BatchProcessor:
     """
