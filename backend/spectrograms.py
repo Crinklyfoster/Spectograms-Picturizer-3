@@ -11,26 +11,19 @@ import logging
 def generate_spectrograms(file_path, selected_types, out_dir, original_basename):
     """
     Generate spectrograms for selected types only.
-    
-    Args:
-        file_path: Path to audio file
-        selected_types: List of spectrogram types to generate
-        out_dir: Output directory for images
-        original_basename: Original filename without extension
-    
-    Returns:
-        dict: Generated spectrogram metadata {type: {path, name, description}}
     """
     results = {}
     
     try:
         # Load audio file
+        logging.info(f"Loading audio file: {file_path}")
         y, sr = librosa.load(file_path, sr=None)
         logging.info(f"Loaded audio: {file_path}, sr={sr}, duration={len(y)/sr:.2f}s")
         
         # Generate only requested spectrograms
         for spec_type in selected_types:
             try:
+                logging.info(f"Generating {spec_type} spectrogram")
                 image_path = os.path.join(out_dir, f"{original_basename}__{spec_type}.png")
                 
                 if spec_type == 'mel':
@@ -45,21 +38,28 @@ def generate_spectrograms(file_path, selected_types, out_dir, original_basename)
                     _generate_spectral_kurtosis(y, sr, image_path, original_basename)
                 elif spec_type == 'modulation':
                     _generate_modulation_spectrogram(y, sr, image_path, original_basename)
+                else:
+                    logging.warning(f"Unknown spectrogram type: {spec_type}")
+                    continue
                 
-                results[spec_type] = {
-                    'path': image_path,
-                    'name': f"{original_basename}__{spec_type}.png",
-                    'description': f"{spec_type.title()} spectrogram"
-                }
-                
-                logging.info(f"Generated {spec_type} spectrogram: {image_path}")
+                # Verify the file was created
+                if os.path.exists(image_path):
+                    results[spec_type] = {
+                        'path': image_path,
+                        'name': f"{original_basename}__{spec_type}.png",
+                        'description': f"{spec_type.title()} spectrogram"
+                    }
+                    logging.info(f"Successfully generated {spec_type} spectrogram: {image_path}")
+                else:
+                    logging.error(f"Failed to create {spec_type} spectrogram file: {image_path}")
                 
             except Exception as e:
-                logging.error(f"Error generating {spec_type} spectrogram: {e}")
+                logging.error(f"Error generating {spec_type} spectrogram: {e}", exc_info=True)
                 continue
     
     except Exception as e:
-        logging.error(f"Error loading audio file {file_path}: {e}")
+        logging.error(f"Error loading audio file {file_path}: {e}", exc_info=True)
+        raise  # Re-raise the exception so the caller knows it failed
     
     return results
 
