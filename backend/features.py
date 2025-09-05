@@ -5,10 +5,11 @@ from scipy import stats
 
 def extract_all_features(file_path):
     """
-    Extract comprehensive audio features from file.
+    Extract comprehensive audio features from file (80 features total).
+    Optimized for motor fault detection and mechanical analysis.
     
     Returns:
-        dict: Dictionary containing all extracted features
+        dict: Dictionary containing all extracted features (80 total)
     """
     try:
         # Load audio
@@ -16,21 +17,31 @@ def extract_all_features(file_path):
         
         features = {}
         
-        # Basic audio properties
+        # Basic audio properties (6 features)
         features.update(_extract_basic_features(y, sr))
         
-        # Spectral features
+        # Spectral features (9 features)
         features.update(_extract_spectral_features(y, sr))
         
-        # Rhythmic features
+        # Rhythmic features (3 features)
         features.update(_extract_rhythmic_features(y, sr))
         
-        # MFCC features
+        # MFCC features (26 features)
         features.update(_extract_mfcc_features(y, sr))
         
-        # Energy and dynamics
+        # Energy and dynamics (7 features)
         features.update(_extract_energy_features(y, sr))
         
+        # NEW: Chroma features for harmonic analysis (12 features)
+        features.update(_extract_chroma_features(y, sr))
+        
+        # NEW: Delta MFCC for capturing dynamics (13 features)
+        features.update(_extract_delta_mfcc_features(y, sr))
+        
+        # NEW: Advanced spectral features for fault detection (4 features)
+        features.update(_extract_advanced_spectral_features(y, sr))
+        
+        logging.info(f"Extracted {len(features)} features from {file_path}")
         return features
         
     except Exception as e:
@@ -38,7 +49,7 @@ def extract_all_features(file_path):
         return {}
 
 def _extract_basic_features(y, sr):
-    """Extract basic audio properties."""
+    """Extract basic audio properties (6 features)."""
     return {
         'duration': len(y) / sr,
         'sample_rate': sr,
@@ -49,7 +60,7 @@ def _extract_basic_features(y, sr):
     }
 
 def _extract_spectral_features(y, sr):
-    """Extract spectral features."""
+    """Extract spectral features (9 features)."""
     # Compute spectral features
     spectral_centroids = librosa.feature.spectral_centroid(y=y, sr=sr)[0]
     spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr)[0]
@@ -69,7 +80,7 @@ def _extract_spectral_features(y, sr):
     }
 
 def _extract_rhythmic_features(y, sr):
-    """Extract rhythm and tempo features."""
+    """Extract rhythm and tempo features (3 features)."""
     try:
         tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
         
@@ -86,7 +97,7 @@ def _extract_rhythmic_features(y, sr):
         }
 
 def _extract_mfcc_features(y, sr):
-    """Extract MFCC features."""
+    """Extract MFCC features (26 features)."""
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
     
     features = {}
@@ -97,7 +108,7 @@ def _extract_mfcc_features(y, sr):
     return features
 
 def _extract_energy_features(y, sr):
-    """Extract energy and dynamics features."""
+    """Extract energy and dynamics features (7 features)."""
     # RMS energy over time
     rms = librosa.feature.rms(y=y)[0]
     
@@ -113,3 +124,90 @@ def _extract_energy_features(y, sr):
         'db_mean': float(np.mean(db_values)),
         'db_std': float(np.std(db_values))
     }
+
+def _extract_chroma_features(y, sr):
+    """
+    Extract chroma features for harmonic analysis (12 features).
+    Excellent for detecting periodic faults in motors.
+    """
+    try:
+        # Compute chromagram (pitch class profiles)
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr, n_chroma=12)
+        
+        features = {}
+        for i in range(12):
+            features[f'chroma_{i+1}'] = float(np.mean(chroma[i]))
+        
+        return features
+        
+    except Exception as e:
+        logging.warning(f"Error extracting chroma features: {e}")
+        # Return zeros if extraction fails
+        return {f'chroma_{i+1}': 0.0 for i in range(12)}
+
+def _extract_delta_mfcc_features(y, sr):
+    """
+    Extract delta MFCC features for capturing dynamics (13 features).
+    Critical for motor fault detection as faults change signal dynamics.
+    """
+    try:
+        # Compute MFCC
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        
+        # Compute delta (first-order derivatives)
+        delta_mfcc = librosa.feature.delta(mfcc, width=9, order=1)
+        
+        features = {}
+        for i in range(13):
+            features[f'delta_mfcc_{i+1}'] = float(np.mean(delta_mfcc[i]))
+        
+        return features
+        
+    except Exception as e:
+        logging.warning(f"Error extracting delta MFCC features: {e}")
+        return {f'delta_mfcc_{i+1}': 0.0 for i in range(13)}
+
+def _extract_advanced_spectral_features(y, sr):
+    """
+    Extract advanced spectral features for fault detection (4 features).
+    Specialized features for detecting mechanical anomalies.
+    """
+    try:
+        # Compute STFT for advanced analysis
+        stft = librosa.stft(y, hop_length=512, n_fft=2048)
+        magnitude = np.abs(stft)
+        
+        # Spectral flux - measure of spectral change over time
+        spectral_flux = np.mean(np.diff(magnitude, axis=1)**2)
+        
+        # Spectral slope - tilt of the spectrum
+        freqs = librosa.fft_frequencies(sr=sr, n_fft=2048)
+        spectral_slope = []
+        for frame in magnitude.T:
+            if np.sum(frame) > 0:
+                # Linear regression slope of log magnitude vs log frequency
+                log_freqs = np.log(freqs[1:] + 1e-8)  # avoid log(0)
+                log_mags = np.log(frame[1:] + 1e-8)
+                slope, _, _, _, _ = stats.linregress(log_freqs, log_mags)
+                spectral_slope.append(slope)
+        
+        # Spectral statistical moments
+        flattened_spectrum = magnitude.flatten()
+        spectral_skewness = float(stats.skew(flattened_spectrum))
+        spectral_kurtosis_val = float(stats.kurtosis(flattened_spectrum))
+        
+        return {
+            'spectral_flux': float(spectral_flux),
+            'spectral_slope_mean': float(np.mean(spectral_slope)) if spectral_slope else 0.0,
+            'spectral_skewness': spectral_skewness,
+            'spectral_kurtosis_val': spectral_kurtosis_val
+        }
+        
+    except Exception as e:
+        logging.warning(f"Error extracting advanced spectral features: {e}")
+        return {
+            'spectral_flux': 0.0,
+            'spectral_slope_mean': 0.0,
+            'spectral_skewness': 0.0,
+            'spectral_kurtosis_val': 0.0
+        }
