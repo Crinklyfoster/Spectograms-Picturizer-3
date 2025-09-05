@@ -316,6 +316,18 @@ def batch_progress():
     
     return render_template('batch_progress.html', config=get_config(), session_id=session_id)
 
+@app.route('/results/<session_id>/<filename>')
+def serve_spectrogram(session_id, filename):
+    """Serve spectrogram images from results directory."""
+    config = get_config()
+    results_path = os.path.join(config['RESULTS_FOLDER'], session_id)
+    
+    # Security check - ensure file exists and is an image
+    file_path = os.path.join(results_path, filename)
+    if not os.path.exists(file_path) or not filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+        return "File not found", 404
+    
+    return send_file(file_path)
 
 if __name__ == '__main__':
     # Ensure directories exist
