@@ -43,119 +43,127 @@ class BatchProcessor:
         os.makedirs(self.results_dir, exist_ok=True)
     
     def process(self):
-    """Main processing method - runs in background thread."""
-    try:
-        # Set status to running
-        with self.batch_status['lock']:
-            self.batch_status['data'][self.session_id]['status'] = 'running'
-            logging.debug(f"Status for {self.session_id} set to running")
-        
-        all_features = []
-        
-        # Process each file sequentially
-        for i, file_info in enumerate(self.file_list):
-            file_name = file_info['saved_name']
-            original_name = file_info['original_name']
-            
-            logging.info(f"Starting processing file {i+1}/{len(self.file_list)}: {file_name}")
-            
-            # Update current file
-            with self.batch_status['lock']:
-                self.batch_status['data'][self.session_id]['current_file'] = file_name
-                logging.debug(f"Current file for {self.session_id}: {file_name}")
-            
-            file_path = get_upload_path(self.session_id, file_name, self.config)
-            
-            # Check if file exists
-            if not os.path.exists(file_path):
-                error_msg = f"File not found: {file_path}"
-                logging.error(error_msg)
-                
-                with self.batch_status['lock']:
-                    self.batch_status['data'][self.session_id]['errors'].append({
-                        'file': file_name,
-                        'message': error_msg
-                    })
-                continue
-            
-            try:
-                logging.info(f"Generating spectrograms for {file_name}")
-                
-                # Generate spectrograms
-                spectrogram_results = generate_spectrograms(
-                    file_path, self.selected_types, self.results_dir, 
-                    os.path.splitext(original_name)[0]
-                )
-                
-                logging.info(f"Generated {len(spectrogram_results)} spectrograms for {file_name}")
-                
-                # Extract features
-                logging.info(f"Extracting features for {file_name}")
-                features = extract_all_features(file_path)
-                
-                if features:
-                    features['filename'] = original_name
-                    features['session_id'] = self.session_id
-                    all_features.append(features)
-                    logging.info(f"Extracted features for {file_name}")
-                else:
-                    logging.warning(f"No features extracted for {file_name}")
-                
-                logging.info(f"Completed processing {file_name} successfully")
-                
-            except Exception as e:
-                error_msg = f"Error processing {file_name}: {str(e)}"
-                logging.error(error_msg, exc_info=True)
-                
-                # Add error to batch status
-                with self.batch_status['lock']:
-                    self.batch_status['data'][self.session_id]['errors'].append({
-                        'file': file_name,
-                        'message': str(e)
-                    })
-            
-            # CRITICAL: Update progress after each file (regardless of success/failure)
-            with self.batch_status['lock']:
-                self.batch_status['data'][self.session_id]['processed_count'] = i + 1
-                logging.debug(f"Updated processed count for {self.session_id}: {i + 1}/{len(self.file_list)}")
-        
-        # Save aggregated features
+        """Main processing method - runs in background thread."""
         try:
-            logging.info(f"Saving {len(all_features)} feature sets")
-            self._save_features(all_features)
-        except Exception as e:
-            logging.error(f"Error saving features: {e}")
+            # Set status to running
             with self.batch_status['lock']:
-                self.batch_status['data'][self.session_id]['errors'].append({
-                    'file': 'FEATURE_SAVE',
-                    'message': f"Error saving features: {str(e)}"
-                })
-        
-        # Mark as completed
-        with self.batch_status['lock']:
-            self.batch_status['data'][self.session_id].update({
-                'status': 'completed',
-                'current_file': None,
-                'end_time': time.time()
-            })
-            logging.debug(f"Status for {self.session_id} set to completed")
-            logging.info(f"Batch processing completed for {self.session_id}")
+                self.batch_status['data'][self.session_id]['status'] = 'running'
+                logging.debug(f"Status for {self.session_id} set to running")
             
-    except Exception as e:
-        logging.error(f"Batch processing failed for {self.session_id}: {e}", exc_info=True)
-        
-        # Mark as failed
-        with self.batch_status['lock']:
-            self.batch_status['data'][self.session_id].update({
-                'status': 'failed',
-                'current_file': None,
-                'end_time': time.time()
-            })
-            self.batch_status['data'][self.session_id]['errors'].append({
-                'file': 'BATCH_PROCESSOR',
-                'message': f"Batch processing failed: {str(e)}"
-            })
-            logging.debug(f"Status for {self.session_id} set to failed")
+            all_features = []
+            
+            # Process each file sequentially
+            for i, file_info in enumerate(self.file_list):
+                file_name = file_info['saved_name']
+                original_name = file_info['original_name']
+                
+                logging.info(f"Starting processing file {i+1}/{len(self.file_list)}: {file_name}")
+                
+                # Update current file
+                with self.batch_status['lock']:
+                    self.batch_status['data'][self.session_id]['current_file'] = file_name
+                    logging.debug(f"Current file for {self.session_id}: {file_name}")
+                
+                file_path = get_upload_path(self.session_id, file_name, self.config)
+                
+                # Check if file exists
+                if not os.path.exists(file_path):
+                    error_msg = f"File not found: {file_path}"
+                    logging.error(error_msg)
+                    
+                    with self.batch_status['lock']:
+                        self.batch_status['data'][self.session_id]['errors'].append({
+                            'file': file_name,
+                            'message': error_msg
+                        })
+                    continue
+                
+                try:
+                    logging.info(f"Generating spectrograms for {file_name}")
+                    
+                    # Generate spectrograms with timeout protection
+                    try:
+                        with timeout_handler(300):  # 5 minute timeout per file
+                            spectrogram_results = generate_spectrograms(
+                                file_path, self.selected_types, self.results_dir, 
+                                os.path.splitext(original_name)[0]
+                            )
+                    except TimeoutError as e:
+                        raise Exception(f"Processing timeout: {str(e)}")
+                    
+                    logging.info(f"Generated {len(spectrogram_results)} spectrograms for {file_name}")
+                    
+                    # Extract features with timeout protection
+                    logging.info(f"Extracting features for {file_name}")
+                    try:
+                        with timeout_handler(120):  # 2 minute timeout for features
+                            features = extract_all_features(file_path)
+                    except TimeoutError as e:
+                        raise Exception(f"Feature extraction timeout: {str(e)}")
+                    
+                    if features:
+                        features['filename'] = original_name
+                        features['session_id'] = self.session_id
+                        all_features.append(features)
+                        logging.info(f"Extracted features for {file_name}")
+                    else:
+                        logging.warning(f"No features extracted for {file_name}")
+                    
+                    logging.info(f"Completed processing {file_name} successfully")
+                    
+                except Exception as e:
+                    error_msg = f"Error processing {file_name}: {str(e)}"
+                    logging.error(error_msg, exc_info=True)
+                    
+                    # Add error to batch status
+                    with self.batch_status['lock']:
+                        self.batch_status['data'][self.session_id]['errors'].append({
+                            'file': file_name,
+                            'message': str(e)
+                        })
+                
+                # CRITICAL: Update progress after each file (regardless of success/failure)
+                with self.batch_status['lock']:
+                    self.batch_status['data'][self.session_id]['processed_count'] = i + 1
+                    logging.debug(f"Updated processed count for {self.session_id}: {i + 1}/{len(self.file_list)}")
+            
+            # Save aggregated features
+            try:
+                logging.info(f"Saving {len(all_features)} feature sets")
+                self._save_features(all_features)
+            except Exception as e:
+                logging.error(f"Error saving features: {e}")
+                with self.batch_status['lock']:
+                    self.batch_status['data'][self.session_id]['errors'].append({
+                        'file': 'FEATURE_SAVE',
+                        'message': f"Error saving features: {str(e)}"
+                    })
+            
+            # Mark as completed
+            with self.batch_status['lock']:
+                self.batch_status['data'][self.session_id].update({
+                    'status': 'completed',
+                    'current_file': None,
+                    'end_time': time.time()
+                })
+                logging.debug(f"Status for {self.session_id} set to completed")
+                logging.info(f"Batch processing completed for {self.session_id}")
+                
+        except Exception as e:
+            logging.error(f"Batch processing failed for {self.session_id}: {e}", exc_info=True)
+            
+            # Mark as failed
+            with self.batch_status['lock']:
+                self.batch_status['data'][self.session_id].update({
+                    'status': 'failed',
+                    'current_file': None,
+                    'end_time': time.time()
+                })
+                self.batch_status['data'][self.session_id]['errors'].append({
+                    'file': 'BATCH_PROCESSOR',
+                    'message': f"Batch processing failed: {str(e)}"
+                })
+                logging.debug(f"Status for {self.session_id} set to failed")
     
     def _save_features(self, features_list):
         """Save extracted features to CSV and JSON files."""
