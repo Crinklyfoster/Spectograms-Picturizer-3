@@ -1,29 +1,9 @@
 import os
 import time
 import logging
-import signal
-from contextlib import contextmanager
 from backend.spectrograms import generate_spectrograms
 from backend.features import extract_all_features
 from backend.utils import get_upload_path
-
-@contextmanager
-def timeout_handler(seconds):
-    """Simplified timeout handler - just yields without timeout on Windows."""
-    # On Windows, signal.SIGALRM is not available
-    # This is a simplified version that doesn't timeout
-    yield
-    
-    # Set the signal handler and a alarm
-    old_handler = signal.signal(signal.SIGALRM, timeout_signal)
-    signal.alarm(seconds)
-    
-    try:
-        yield
-    finally:
-        # Restore the old signal handler
-        signal.signal(signal.SIGALRM, old_handler)
-        signal.alarm(0)
 
 class BatchProcessor:
     """
@@ -77,30 +57,27 @@ class BatchProcessor:
                             'file': file_name,
                             'message': error_msg
                         })
+                    
+                    # Update progress even for failed files
+                    with self.batch_status['lock']:
+                        self.batch_status['data'][self.session_id]['processed_count'] = i + 1
+                        logging.debug(f"Updated processed count for {self.session_id}: {i + 1}/{len(self.file_list)}")
                     continue
                 
                 try:
                     logging.info(f"Generating spectrograms for {file_name}")
                     
-                    # Generate spectrograms with timeout protection
-                    try:
-                        with timeout_handler(300):  # 5 minute timeout per file
-                            spectrogram_results = generate_spectrograms(
-                                file_path, self.selected_types, self.results_dir, 
-                                os.path.splitext(original_name)[0]
-                            )
-                    except TimeoutError as e:
-                        raise Exception(f"Processing timeout: {str(e)}")
+                    # Generate spectrograms (without timeout)
+                    spectrogram_results = generate_spectrograms(
+                        file_path, self.selected_types, self.results_dir, 
+                        os.path.splitext(original_name)[0]
+                    )
                     
                     logging.info(f"Generated {len(spectrogram_results)} spectrograms for {file_name}")
                     
-                    # Extract features with timeout protection
+                    # Extract features
                     logging.info(f"Extracting features for {file_name}")
-                    try:
-                        with timeout_handler(120):  # 2 minute timeout for features
-                            features = extract_all_features(file_path)
-                    except TimeoutError as e:
-                        raise Exception(f"Feature extraction timeout: {str(e)}")
+                    features = extract_all_features(file_path)
                     
                     if features:
                         features['filename'] = original_name
@@ -123,7 +100,7 @@ class BatchProcessor:
                             'message': str(e)
                         })
                 
-                # CRITICAL: Update progress after each file (regardless of success/failure)
+                # CRITICAL: Always update progress after each file (success or failure)
                 with self.batch_status['lock']:
                     self.batch_status['data'][self.session_id]['processed_count'] = i + 1
                     logging.debug(f"Updated processed count for {self.session_id}: {i + 1}/{len(self.file_list)}")
