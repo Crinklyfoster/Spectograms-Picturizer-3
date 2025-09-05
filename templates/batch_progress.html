@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Processing - Audio Processor v3.0{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h1>Processing Audio Files</h1>
+            <p>Session: <code>{{ request.args.get('session_id') }}</code></p>
+        </div>
+        
+        <div class="card-body">
+            <div class="progress-section">
+                <div class="progress-info">
+                    <h3 id="statusText">Initializing...</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-details">
+                        <span id="progressText">0%</span>
+                        <span id="fileCount">0 / 0 files</span>
+                    </div>
+                </div>
+                
+                <div class="current-file" id="currentFileSection" style="display: none;">
+                    <h4>Currently Processing:</h4>
+                    <span id="currentFileName">-</span>
+                </div>
+            </div>
+            
+            <div class="logs-section">
+                <h3>Processing Log</h3>
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry">Starting batch processing...</div>
+                </div>
+            </div>
+            
+            <div class="errors-section" id="errorsSection" style="display: none;">
+                <h3>Errors</h3>
+                <div class="error-list" id="errorsList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="sessionId" value="{{ request.args.get('session_id') }}">
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/progress.js') }}"></script>
+{% endblock %}
