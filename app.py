@@ -302,6 +302,21 @@ def delete_session(session_id):
         logging.error(f"Error deleting session {session_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/batch_progress')
+def batch_progress():
+    session_id = request.args.get('session_id')
+    if not session_id:
+        return redirect(url_for('index'))
+    
+    with batch_status['lock']:
+        session_data = batch_status['data'].get(session_id)
+    
+    if not session_data:
+        return redirect(url_for('index'))
+    
+    return render_template('batch_progress.html', config=get_config(), session_id=session_id)
+
+
 if __name__ == '__main__':
     # Ensure directories exist
     config = get_config()
