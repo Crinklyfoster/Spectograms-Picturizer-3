@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const manageLink = document.getElementById('manageLink');
     
     let currentFiles = [];
+    let isProcessingFiles = false; // Add flag to prevent double processing
 
     // Drag and drop handlers
     uploadArea.addEventListener('dragover', function(e) {
@@ -30,16 +31,37 @@ document.addEventListener('DOMContentLoaded', function() {
         handleFiles(e.dataTransfer.files);
     });
 
-    uploadArea.addEventListener('click', function() {
-        fileInput.click();
+    // Fixed click handler - only trigger if not clicking on the file input directly
+    uploadArea.addEventListener('click', function(e) {
+        // Don't trigger if clicking on the file input itself or if already processing
+        if (e.target !== fileInput && !isProcessingFiles) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        }
     });
 
-    fileInput.addEventListener('change', function() {
-        handleFiles(this.files);
+    // Fixed file input change handler
+    fileInput.addEventListener('change', function(e) {
+        // Prevent double processing
+        if (isProcessingFiles) return;
+        
+        isProcessingFiles = true;
+        
+        if (this.files && this.files.length > 0) {
+            handleFiles(this.files);
+        }
+        
+        // Reset the input value to allow selecting the same files again if needed
+        setTimeout(() => {
+            this.value = '';
+            isProcessingFiles = false;
+        }, 100);
     });
 
     clearBtn.addEventListener('click', function() {
         currentFiles = [];
+        fileInput.value = ''; // Clear the file input
         updateFilesList();
     });
 
