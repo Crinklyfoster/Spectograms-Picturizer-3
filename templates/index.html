@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Audio Files - Audio Processor v3.0{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h1>Upload Audio Files</h1>
+            <p>Select up to {{ config.MAX_FILES_PER_BATCH }} audio files (max {{ config.MAX_DURATION_SECONDS }}s each)</p>
+        </div>
+        
+        <div class="card-body">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-content">
+                    <div class="upload-icon">📁</div>
+                    <h3>Drag & Drop Audio Files</h3>
+                    <p>or</p>
+                    <label for="fileInput" class="btn btn-secondary">Choose Files</label>
+                    <input type="file" id="fileInput" multiple accept="audio/*" style="display: none;">
+                </div>
+            </div>
+            
+            <div class="file-list" id="selectedFiles" style="display: none;">
+                <h3>Selected Files</h3>
+                <div id="filesList"></div>
+            </div>
+            
+            <div class="upload-controls" id="uploadControls" style="display: none;">
+                <button id="uploadBtn" class="btn btn-primary">Upload Only</button>
+                <button id="clearBtn" class="btn btn-secondary">Clear All</button>
+            </div>
+            
+            <div class="upload-results" id="uploadResults" style="display: none;">
+                <h3>Upload Results</h3>
+                <div id="resultsContent"></div>
+                <div id="nextStepBtn" style="display: none;">
+                    <a href="#" class="btn btn-primary" id="manageLink">Go to Manage Files →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="info-card">
+        <h3>Supported Formats</h3>
+        <div class="format-tags">
+            {% for ext in config.ALLOWED_EXTENSIONS %}
+            <span class="tag">{{ ext|upper }}</span>
+            {% endfor %}
+        </div>
+        
+        <h3>File Constraints</h3>
+        <ul>
+            <li>Maximum duration: {{ config.MAX_DURATION_SECONDS }} seconds</li>
+            <li>Maximum files per batch: {{ config.MAX_FILES_PER_BATCH|default(1048575) }}</li>
+            <li>Files exceeding limits will be rejected</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+{% endblock %}
