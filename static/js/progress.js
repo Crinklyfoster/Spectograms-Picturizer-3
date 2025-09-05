@@ -6,20 +6,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileCount = document.getElementById('fileCount');
     const currentFileSection = document.getElementById('currentFileSection');
     const currentFileName = document.getElementById('currentFileName');
-    const logContainer = document.getElementById('logContainer');
     const errorsSection = document.getElementById('errorsSection');
     const errorsList = document.getElementById('errorsList');
     
     let pollInterval;
     let isCompleted = false;
-    
-    function addLogEntry(message, type = 'info') {
-        const logEntry = document.createElement('div');
-        logEntry.className = `log-entry ${type}`;
-        logEntry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
-        logContainer.appendChild(logEntry);
-        logContainer.scrollTop = logContainer.scrollHeight;
-    }
     
     function updateProgress(data) {
         const { status, processed_count, total_files, current_file, progress_percent, errors, end_time } = data;
@@ -59,12 +50,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 clearInterval(pollInterval);
                 
                 if (status === 'completed') {
-                    addLogEntry('Processing completed successfully!', 'success');
+                    statusText.textContent = 'Processing completed successfully!';
                     setTimeout(() => {
                         window.location.href = `/results/${sessionId}`;
                     }, 2000);
                 } else {
-                    addLogEntry('Processing failed. Check errors above.', 'error');
+                    statusText.textContent = 'Processing failed. Check errors above.';
                 }
             }
         }
@@ -90,26 +81,20 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    addLogEntry(`Error: ${data.error}`, 'error');
+                    statusText.textContent = `Error: ${data.error}`;
                     clearInterval(pollInterval);
                     return;
                 }
                 
                 updateProgress(data);
-                
-                // Log progress updates
-                if (data.current_file) {
-                    addLogEntry(`Processing: ${data.current_file}`);
-                }
             })
             .catch(error => {
                 console.error('Error polling status:', error);
-                addLogEntry(`Polling error: ${error.message}`, 'error');
+                statusText.textContent = `Polling error: ${error.message}`;
             });
     }
     
     // Start polling immediately and then every 2 seconds
-    addLogEntry('Starting batch processing...');
     pollBatchStatus();
     pollInterval = setInterval(pollBatchStatus, 2000);
     
