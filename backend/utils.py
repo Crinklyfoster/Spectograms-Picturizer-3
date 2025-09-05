@@ -31,7 +31,18 @@ def get_upload_path(session_id, filename, config):
 
 def create_zip_for_spectrograms(session_id, config):
     """
-    Create ZIP file containing generated spectrograms and manifest.
+    Create ZIP file containing generated spectrograms with separate folders per audio file.
+    
+    ZIP Structure:
+    session_id/
+    ├── audio1/
+    │   ├── audio1__mel.png
+    │   ├── audio1__log_stft.png
+    │   └── audio1__wavelet.png
+    ├── audio2/
+    │   ├── audio2__mel.png
+    │   └── audio2__log_stft.png
+    └── manifest.csv
     
     Returns:
         str: Path to created ZIP file or None if no spectrograms found
@@ -52,7 +63,9 @@ def create_zip_for_spectrograms(session_id, config):
     
     try:
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Add spectrogram images
+            # Group files by original audio filename
+            audio_groups = {}
+            
             for png_file in png_files:
                 file_path = os.path.join(results_dir, png_file)
                 
@@ -64,18 +77,33 @@ def create_zip_for_spectrograms(session_id, config):
                         spec_type_ext = parts[1]  # spec_type.png
                         spec_type = spec_type_ext.replace('.png', '')
                         
-                        # Archive path format: {session_id}/{original_basename}__{spec_type}.png
-                        archive_path = f"{session_id}/{png_file}"
+                        # Group by original audio file
+                        if original_basename not in audio_groups:
+                            audio_groups[original_basename] = []
                         
-                        zipf.write(file_path, archive_path)
-                        
-                        manifest_rows.append({
-                            'file': original_basename,
-                            'spectrogram_type': spec_type,
-                            'archive_path': archive_path,
-                            'status': 'success',
-                            'error': ''
+                        audio_groups[original_basename].append({
+                            'png_file': png_file,
+                            'spec_type': spec_type,
+                            'file_path': file_path
                         })
+            
+            # Add files to ZIP with folder structure: session_id/audio_name/spectrograms
+            for original_basename, spectrograms in audio_groups.items():
+                for spec_info in spectrograms:
+                    # Create folder structure: session_id/original_basename/filename.png
+                    archive_path = f"{session_id}/{original_basename}/{spec_info['png_file']}"
+                    
+                    # Add file to ZIP
+                    zipf.write(spec_info['file_path'], archive_path)
+                    
+                    # Add to manifest
+                    manifest_rows.append({
+                        'file': original_basename,
+                        'spectrogram_type': spec_info['spec_type'],
+                        'archive_path': archive_path,
+                        'status': 'success',
+                        'error': ''
+                    })
             
             # Create and add manifest.csv
             manifest_path = os.path.join(results_dir, 'manifest.csv')
@@ -86,10 +114,10 @@ def create_zip_for_spectrograms(session_id, config):
                     writer.writeheader()
                     writer.writerows(manifest_rows)
             
-            # Add manifest to ZIP
+            # Add manifest to ZIP root
             zipf.write(manifest_path, 'manifest.csv')
         
-        logging.info(f"Created ZIP file: {zip_path} with {len(png_files)} spectrograms")
+        logging.info(f"Created ZIP file: {zip_path} with {len(png_files)} spectrograms organized in {len(audio_groups)} folders")
         return zip_path
         
     except Exception as e:
